@@ -27,11 +27,13 @@ const TransactionHistory = () => {
   useEffect(() => {
     const fetchTransactions = async () => {
       setLoading(true);
+      
       try {
         // 0 is for buying transactions, 1 is for selling transactions
         const transactionType = tabValue === 0 ? 'Buying' : 'Selling';
         const transactionData = await getUserTransactionsByType(userId, transactionType);
         setTransactions(transactionData);
+        
       } catch (error) {
         console.error("Failed to fetch transactions:", error);
       } finally {
@@ -102,7 +104,7 @@ const TransactionHistory = () => {
                     </TableCell>
                     {tabValue === 1 && (
                       <TableCell align="right">
-                        {transaction.profitOrLoss ? (
+                        {transaction.profitOrLoss !== null && transaction.profitOrLoss !== undefined ? (
                           <Chip 
                             label={`${transaction.profitOrLoss > 0 ? '+' : ''}$${transaction.profitOrLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             color={transaction.profitOrLoss > 0 ? 'success' : 'error'}

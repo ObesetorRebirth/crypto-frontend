@@ -1,69 +1,212 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { getTop20Cryptos, buyCrypto } from '../services/api'; // Import API functions
 import { UserContext } from '../context/UserContext';
-import { Button, Table, TableCell, TableRow, TableBody, TableHead, TableContainer, Paper, CircularProgress } from '@mui/material';
+import axios from 'axios';
+import './CryptoMarket.css';
+import { getTop20Cryptos, buyCrypto, getUserBalance } from '../services/api';
 
-const CryptoMarket = () => {
+const CryptoMarketPage = () => {
   const [cryptos, setCryptos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { userId, balance, updateBalance } = useContext(UserContext);
+  const [error, setError] = useState(null);
+  const [selectedCrypto, setSelectedCrypto] = useState(null);
+  const [amount, setAmount] = useState('');
+  const [showBuyForm, setShowBuyForm] = useState(false);
+  const [purchaseStatus, setPurchaseStatus] = useState(null);
+  const { userId, updateBalance } = useContext(UserContext);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
+  // Fetch cryptos initially and set up refresh interval
   useEffect(() => {
-    const fetchCryptos = async () => {
-      try {
-        const cryptoData = await getTop20Cryptos(); // Call the API
-        setCryptos(cryptoData);
-      } catch (error) {
-        console.error('Error fetching cryptos:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchCryptos();
+    
+    // Set up automatic refresh every 30 seconds
+    const refreshInterval = setInterval(() => {
+      console.log("Refreshing crypto prices...");
+      fetchCryptos();
+    }, 4000);
+    
+    // Clean up interval on component unmount
+    return () => clearInterval(refreshInterval);
   }, []);
 
-  const handleBuy = async (cryptoId, quantity) => {
+  const fetchCryptos = async () => {
     try {
-      await buyCrypto(userId, cryptoId, quantity); // Call the API
-      // Update balance and other states after the purchase
-      const newBalance = balance - (cryptoId * quantity); // Example calculation
-      updateBalance(newBalance);
-    } catch (error) {
-      console.error('Error buying crypto:', error);
+      setLoading(true);
+      
+      // Get crypto data from the API
+      const cryptoData = await getTop20Cryptos();
+      
+      // Map the data to match your exact API structure
+      const processedData = Array.isArray(cryptoData) ? cryptoData.map(crypto => {
+        return {
+          id: crypto.id,
+          name: crypto.cryptoName,
+          symbol: crypto.symbol,
+          price: crypto.currentPrice,
+          priceChange24h: 0
+        };
+      }) : [];
+      
+      setCryptos(processedData);
+      setLastUpdated(new Date());
+      setError(null);
+    } catch (err) {
+      setError('Failed to load cryptocurrencies');
+      console.error('Error fetching cryptos:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return <CircularProgress />;
-  }
+  const openBuyForm = (crypto) => {
+    setSelectedCrypto(crypto);
+    setAmount('');
+    setPurchaseStatus(null);
+    setShowBuyForm(true);
+  };
+
+  const handleBuy = async (e) => {
+    e.preventDefault();
+    
+    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+      setPurchaseStatus({
+        success: false,
+        message: 'Please enter a valid amount'
+      });
+      return;
+    }
+    
+    try {
+      // Use the imported buyCrypto function if it exists,
+      // otherwise fall back to direct axios call with the correct endpoint
+      if (typeof buyCrypto === 'function') {
+        // Using the imported buyCrypto function
+        await buyCrypto(userId, selectedCrypto.id, parseFloat(amount));
+      } else {
+        // If buyCrypto isn't available, try these common API endpoints
+        // Change the URL to match your actual API endpoint
+        await axios.post('/api/transactions/buy', {
+          cryptoId: selectedCrypto.id,
+          amount: parseFloat(amount)
+        });
+      }
+
+      const newBalance = await getUserBalance(userId);
+      updateBalance(newBalance);  
+      
+      setPurchaseStatus({
+        success: true,
+        message: `Successfully purchased ${amount} ${selectedCrypto.symbol}`
+      });
+      
+      // Close the form after a short delay
+      setTimeout(() => {
+        setShowBuyForm(false);
+        setPurchaseStatus(null);
+      }, 2000);
+      
+      // Refresh crypto list to update balances
+      fetchCryptos();
+      
+    } catch (err) {
+      let errorMessage = 'Failed to complete purchase';
+      
+      if (err.response && err.response.data) {
+        errorMessage = typeof err.response.data === 'string' 
+          ? err.response.data 
+          : err.response.data.message || 'Purchase failed';
+      }
+      
+      setPurchaseStatus({
+        success: false,
+        message: errorMessage
+      });
+      console.error('Error buying crypto:', err);
+    }
+  };
+  
+  // Helper function to safely format numbers
+  const safeToFixed = (value, decimals = 2) => {
+    if (value === undefined || value === null || isNaN(parseFloat(value))) {
+      return '0.00';
+    }
+    return parseFloat(value).toFixed(decimals);
+  };
 
   return (
-    <TableContainer component={Paper}>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell>#</TableCell>
-            <TableCell>Name</TableCell>
-            <TableCell>Price</TableCell>
-            <TableCell>Action</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {cryptos.map((crypto, index) => (
-            <TableRow key={crypto.id}>
-              <TableCell>{index + 1}</TableCell>
-              <TableCell>{crypto.name}</TableCell>
-              <TableCell>{crypto.price}</TableCell>
-              <TableCell>
-                <Button onClick={() => handleBuy(crypto.id, 1)}>Buy</Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+    <div className="crypto-market-container">
+      <h1>Cryptocurrency Market</h1>
+      {lastUpdated && (
+      <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '-10px' }}>
+        Last updated: {lastUpdated.toLocaleTimeString()}
+      </p>
+    )}
+      {loading && <p>Loading cryptocurrencies...</p>}
+      {error && <p className="error-message">{error}</p>}
+      
+      <div className="crypto-list">
+        {cryptos.length === 0 && !loading ? (
+          <p>No cryptocurrencies available. Please check your API connection.</p>
+        ) : (
+          cryptos.map(crypto => (
+            <div key={crypto.id} className="crypto-card">
+              <div className="crypto-info">
+                <h3>{crypto.name}</h3>
+                <p className="crypto-symbol">{crypto.symbol}</p>
+                <p className="crypto-price">${safeToFixed(crypto.price)}</p>
+              </div>
+              <button 
+                className="buy-button"
+                onClick={() => openBuyForm(crypto)}
+              >
+                Buy
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+      
+      {showBuyForm && selectedCrypto && (
+        <div className="modal-overlay">
+          <div className="buy-form-modal">
+            <button className="close-button" onClick={() => setShowBuyForm(false)}>×</button>
+            <h2>Buy {selectedCrypto.name}</h2>
+            <p>Current price: ${safeToFixed(selectedCrypto.price)}</p>
+            
+            <form onSubmit={handleBuy}>
+              <div className="form-group">
+                <label htmlFor="amount">Amount to buy:</label>
+                <input
+                  type="number"
+                  id="amount"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="Enter amount"
+                  step="0.000001"
+                  min="0"
+                  required
+                />
+              </div>
+              
+              {amount && !isNaN(amount) && (
+                <p className="estimate">
+                  Estimated cost: ${safeToFixed(parseFloat(amount) * selectedCrypto.price)}
+                </p>
+              )}
+              
+              {purchaseStatus && (
+                <div className={`status-message ${purchaseStatus.success ? 'success' : 'error'}`}>
+                  {purchaseStatus.message}
+                </div>
+              )}
+              
+              <button type="submit" className="submit-button">Confirm Purchase</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
-export default CryptoMarket;
+export default CryptoMarketPage;

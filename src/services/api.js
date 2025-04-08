@@ -25,15 +25,14 @@ export const getUserBalance = async (userId) => {
 
 export const buyCrypto = async (userId, cryptoId, quantity) => {
   try {
-    const response = await axios.post(`${BASE_URL}/transaction/${userId}/buy/${cryptoId}`, null, {
+    await axios.post(`${BASE_URL}/transaction/${userId}/buy/${cryptoId}`, null, {
       params: { quantity }
     });
-    return response.data;
   } catch (error) {
-    console.error('Error buying crypto:', error);
+    console.error('Error buying crypto:', error.response?.data || error.message);
     throw error;
   }
-};
+};  
 
 export const sellCrypto = async (userId, cryptoId, quantity) => {
     try {
@@ -64,6 +63,11 @@ export const sellCrypto = async (userId, cryptoId, quantity) => {
       console.error('Error resetting user account:', error);
       throw error;
     }
+  };
+
+  export const getProfitOrLoss = async (transactionId) => {
+    const response = await axios.get(`${BASE_URL}/transaction/${transactionId}/profitOrLoss`);
+    return response.data;
   };
 
   export const getUserTransactionsByType = async (userId, transactionType) => {
