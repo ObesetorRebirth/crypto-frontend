@@ -1,7 +1,6 @@
-// src/services/apiService.js
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:8080'; // The URL of your Spring Boot backend
+const BASE_URL = 'http://localhost:8080'; 
 
 export const getTop20Cryptos = async () => {
   try {
@@ -58,7 +57,7 @@ export const sellCrypto = async (userId, cryptoId, quantity) => {
   export const resetUserAccount = async (userId) => {
     try {
       const response = await axios.put(`${BASE_URL}/user/${userId}/reset`);
-      return response.data; // You can return success message or other response data
+      return response.data;
     } catch (error) {
       console.error('Error resetting user account:', error);
       throw error;
@@ -73,7 +72,7 @@ export const sellCrypto = async (userId, cryptoId, quantity) => {
   export const getUserTransactionsByType = async (userId, transactionType) => {
     try {
       const response = await axios.get(`${BASE_URL}/transaction/${userId}/${transactionType}`);
-      return response.data; // The transactions data from the backend
+      return response.data;
     } catch (error) {
       console.error('Error fetching user transactions by type:', error);
       throw error;

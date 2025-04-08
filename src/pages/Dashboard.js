@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { getTop20Cryptos, getUserBalance, getUserHoldings } from '../services/api'; // Import from apiService
+import { getTop20Cryptos, getUserBalance, getUserHoldings } from '../services/api';
 import { UserContext } from '../context/UserContext';
 
 const Dashboard = () => {
@@ -11,13 +11,12 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const cryptoData = await getTop20Cryptos(); // Fetch top 20 cryptos from backend
+        const cryptoData = await getTop20Cryptos(); 
         setTopCryptos(cryptoData);
 
-        const userBalance = await getUserBalance(userId); // Fetch balance from backend
-        // update balance if needed
+        const userBalance = await getUserBalance(userId);
 
-        const userHoldings = await getUserHoldings(userId); // Fetch holdings from backend
+        const userHoldings = await getUserHoldings(userId); 
         setHoldings(userHoldings);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);

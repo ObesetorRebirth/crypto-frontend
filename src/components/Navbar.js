@@ -17,7 +17,6 @@ const Navbar = () => {
       await resetUserAccount(userId);
       updateBalance(10000);
       alert('Account has been reset successfully!');
-      // In a real app, you'd also want to refresh the portfolio data
       window.location.reload();
     } catch (error) {
       console.error('Failed to reset account:', error);

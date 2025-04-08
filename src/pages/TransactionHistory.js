@@ -20,7 +20,7 @@ import {getUserTransactionsByType} from '../services/api';
 const TransactionHistory = () => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tabValue, setTabValue] = useState(0); // 0 for buying, 1 for selling
+  const [tabValue, setTabValue] = useState(0); 
   
   const { userId } = useContext(UserContext);
 
@@ -29,7 +29,6 @@ const TransactionHistory = () => {
       setLoading(true);
       
       try {
-        // 0 is for buying transactions, 1 is for selling transactions
         const transactionType = tabValue === 0 ? 'Buying' : 'Selling';
         const transactionData = await getUserTransactionsByType(userId, transactionType);
         setTransactions(transactionData);

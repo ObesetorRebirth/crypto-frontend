@@ -15,17 +15,14 @@ const CryptoMarketPage = () => {
   const { userId, updateBalance } = useContext(UserContext);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Fetch cryptos initially and set up refresh interval
   useEffect(() => {
     fetchCryptos();
     
-    // Set up automatic refresh every 30 seconds
     const refreshInterval = setInterval(() => {
       console.log("Refreshing crypto prices...");
       fetchCryptos();
     }, 4000);
     
-    // Clean up interval on component unmount
     return () => clearInterval(refreshInterval);
   }, []);
 
@@ -33,10 +30,8 @@ const CryptoMarketPage = () => {
     try {
       setLoading(true);
       
-      // Get crypto data from the API
       const cryptoData = await getTop20Cryptos();
       
-      // Map the data to match your exact API structure
       const processedData = Array.isArray(cryptoData) ? cryptoData.map(crypto => {
         return {
           id: crypto.id,
@@ -77,14 +72,9 @@ const CryptoMarketPage = () => {
     }
     
     try {
-      // Use the imported buyCrypto function if it exists,
-      // otherwise fall back to direct axios call with the correct endpoint
       if (typeof buyCrypto === 'function') {
-        // Using the imported buyCrypto function
         await buyCrypto(userId, selectedCrypto.id, parseFloat(amount));
       } else {
-        // If buyCrypto isn't available, try these common API endpoints
-        // Change the URL to match your actual API endpoint
         await axios.post('/api/transactions/buy', {
           cryptoId: selectedCrypto.id,
           amount: parseFloat(amount)
@@ -98,14 +88,11 @@ const CryptoMarketPage = () => {
         success: true,
         message: `Successfully purchased ${amount} ${selectedCrypto.symbol}`
       });
-      
-      // Close the form after a short delay
       setTimeout(() => {
         setShowBuyForm(false);
         setPurchaseStatus(null);
       }, 2000);
       
-      // Refresh crypto list to update balances
       fetchCryptos();
       
     } catch (err) {
@@ -125,7 +112,6 @@ const CryptoMarketPage = () => {
     }
   };
   
-  // Helper function to safely format numbers
   const safeToFixed = (value, decimals = 2) => {
     if (value === undefined || value === null || isNaN(parseFloat(value))) {
       return '0.00';

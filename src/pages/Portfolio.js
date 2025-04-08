@@ -18,8 +18,8 @@ import {
   Box
 } from '@mui/material';
 import { UserContext } from '../context/UserContext';
-import { getUserHoldings } from '../services/api'; // Use API call instead of userCryptoService
-import { sellCrypto } from '../services/api'; // Use API call for buy/sell
+import { getUserHoldings } from '../services/api'; 
+import { sellCrypto } from '../services/api'; 
 import { getTop20Cryptos } from '../services/api';
 
 const Portfolio = () => {
@@ -36,11 +36,9 @@ const Portfolio = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Get user holdings
         const holdingsData = await getUserHoldings(userId);
         setHoldings(holdingsData);
         
-        // Get current crypto prices
         const cryptoData = await getTop20Cryptos();
         const prices = {};
         cryptoData.forEach(crypto => {
@@ -56,7 +54,6 @@ const Portfolio = () => {
 
     fetchData();
     
-    // Refresh data every 10 seconds
     const intervalId = setInterval(fetchData, 10000);
     
     return () => clearInterval(intervalId);
@@ -89,15 +86,12 @@ const Portfolio = () => {
     try {
       await sellCrypto(userId, selectedHolding.cryptoId, Number(sellQuantity));
       
-      // Calculate the amount to add to balance
       const currentPrice = cryptoPrices[selectedHolding.cryptoId];
       const saleAmount = Number(sellQuantity) * currentPrice;
       
-      // Update balance after successful sale
       const newBalance = balance + saleAmount;
       updateBalance(newBalance);
       
-      // Update holdings list (better would be to refetch, but this is simpler for demo)
       const updatedHoldings = holdings.map(h => {
         if (h.cryptoId === selectedHolding.cryptoId) {
           const newQuantity = h.quantity - Number(sellQuantity);
@@ -118,7 +112,6 @@ const Portfolio = () => {
     }
   };
 
-  // Calculate total portfolio value
   const calculateTotalValue = () => {
     return holdings.reduce((total, holding) => {
       const price = cryptoPrices[holding.cryptoId] || 0;
