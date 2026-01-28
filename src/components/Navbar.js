@@ -6,16 +6,22 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import { UserContext } from '../context/UserContext';
-
-import { resetUserAccount } from '../services/api';
+import { useResetAccount } from '../hooks';
 
 const Navbar = () => {
   const { userId, balance, updateBalance } = useContext(UserContext);
+  
+  const resetAccountMutation = useResetAccount((newBalance) => {
+    updateBalance(newBalance);
+  });
 
   const handleReset = async () => {
+    const confirmed = window.confirm('Are you sure you want to reset your account? This will delete all your holdings and reset your balance to $10,000.');
+    
+    if (!confirmed) return;
+    
     try {
-      await resetUserAccount(userId);
-      updateBalance(10000);
+      await resetAccountMutation.mutateAsync(userId);
       alert('Account has been reset successfully!');
       window.location.reload();
     } catch (error) {
@@ -53,9 +59,10 @@ const Navbar = () => {
             variant="outlined" 
             color="error" 
             onClick={handleReset}
+            disabled={resetAccountMutation.isPending}
             sx={{ borderColor: 'red', color: 'white' }}
           >
-            Reset Account
+            {resetAccountMutation.isPending ? 'Resetting...' : 'Reset Account'}
           </Button>
         </Box>
       </Toolbar>

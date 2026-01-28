@@ -1,19 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Routes, Route } from 'react-router-dom'; 
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
-import { getUserBalance } from './services/api';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
-// Components
 import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import CryptoMarket from './pages/CryptoMarket';
 import Portfolio from './pages/Portfolio';
 import TransactionHistory from './pages/TransactionHistory';
 
-// Context
 import { UserContext } from './context/UserContext';
+
+// Create a client for React Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false, // Don't refetch on window focus
+      retry: 1,
+    },
+  },
+});
 
 const theme = createTheme({
   palette: {
@@ -36,49 +45,32 @@ const theme = createTheme({
 
 function App() {
   const [userId] = useState(1);
-  const [balance, setBalance] = useState(0);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchUserBalance = async () => {
-      try {
-        const balanceData = await getUserBalance(userId);
-        setBalance(balanceData);
-      } catch (error) {
-        console.error("Failed to fetch user balance:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserBalance();
-  }, [userId]);
+  const [balance, setBalance] = useState(10000);
 
   const updateBalance = (newBalance) => {
     setBalance(newBalance);
   };
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <UserContext.Provider value={{ userId, balance, updateBalance }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-          <Navbar />
-          <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/market" element={<CryptoMarket />} />
-              <Route path="/portfolio" element={<Portfolio />} />
-              <Route path="/transactions" element={<TransactionHistory />} />
-            </Routes>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <UserContext.Provider value={{ userId, balance, updateBalance }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+            <Navbar />
+            <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/market" element={<CryptoMarket />} />
+                <Route path="/portfolio" element={<Portfolio />} />
+                <Route path="/transactions" element={<TransactionHistory />} />
+              </Routes>
+            </Box>
           </Box>
-        </Box>
-      </UserContext.Provider>
-    </ThemeProvider>
+        </UserContext.Provider>
+      </ThemeProvider>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 

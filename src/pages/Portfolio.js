@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import { 
   Paper, 
   Table, 
@@ -18,46 +18,27 @@ import {
   Box
 } from '@mui/material';
 import { UserContext } from '../context/UserContext';
-import { getUserHoldings } from '../services/api'; 
-import { sellCrypto } from '../services/api'; 
-import { getTop20Cryptos } from '../services/api';
+import { useUserHoldings, useCryptos, useSellCrypto } from '../hooks';
 
 const Portfolio = () => {
-  const [holdings, setHoldings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [cryptoPrices, setCryptoPrices] = useState({});
   const [openSellDialog, setOpenSellDialog] = useState(false);
   const [selectedHolding, setSelectedHolding] = useState(null);
   const [sellQuantity, setSellQuantity] = useState('');
-  const [processingTransaction, setProcessingTransaction] = useState(false);
   
   const { userId, balance, updateBalance } = useContext(UserContext);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const holdingsData = await getUserHoldings(userId);
-        setHoldings(holdingsData);
-        
-        const cryptoData = await getTop20Cryptos();
-        const prices = {};
-        cryptoData.forEach(crypto => {
-          prices[crypto.id] = crypto.currentPrice;
-        });
-        setCryptoPrices(prices);
-      } catch (error) {
-        console.error("Failed to fetch portfolio data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data: holdings = [], isLoading: holdingsLoading } = useUserHoldings(userId);
+  const { data: cryptoData = [] } = useCryptos();
+  
+  const sellCryptoMutation = useSellCrypto((newBalance) => {
+    updateBalance(newBalance);
+  });
 
-    fetchData();
-    
-    const intervalId = setInterval(fetchData, 10000);
-    
-    return () => clearInterval(intervalId);
-  }, [userId]);
+  // Create a price map from crypto data
+  const cryptoPrices = {};
+  cryptoData.forEach(crypto => {
+    cryptoPrices[crypto.id] = crypto.currentPrice;
+  });
 
   const handleOpenSellDialog = (holding) => {
     setSelectedHolding(holding);
@@ -81,34 +62,18 @@ const Portfolio = () => {
       return;
     }
 
-    setProcessingTransaction(true);
-    
     try {
-      await sellCrypto(userId, selectedHolding.cryptoId, Number(sellQuantity));
-      
-      const currentPrice = cryptoPrices[selectedHolding.cryptoId];
-      const saleAmount = Number(sellQuantity) * currentPrice;
-      
-      const newBalance = balance + saleAmount;
-      updateBalance(newBalance);
-      
-      const updatedHoldings = holdings.map(h => {
-        if (h.cryptoId === selectedHolding.cryptoId) {
-          const newQuantity = h.quantity - Number(sellQuantity);
-          return newQuantity > 0 ? { ...h, quantity: newQuantity } : null;
-        }
-        return h;
-      }).filter(Boolean);
-      
-      setHoldings(updatedHoldings);
+      await sellCryptoMutation.mutateAsync({
+        userId,
+        cryptoId: selectedHolding.cryptoId,
+        quantity: Number(sellQuantity)
+      });
       
       alert(`Successfully sold ${sellQuantity} ${selectedHolding.cryptoName}`);
       handleCloseSellDialog();
     } catch (error) {
       console.error("Transaction failed:", error);
       alert(`Transaction failed: ${error.message || 'Unknown error'}`);
-    } finally {
-      setProcessingTransaction(false);
     }
   };
 
@@ -119,7 +84,7 @@ const Portfolio = () => {
     }, 0);
   };
 
-  if (loading) {
+  if (holdingsLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <CircularProgress />
@@ -190,7 +155,6 @@ const Portfolio = () => {
         </TableContainer>
       )}
 
-      {/* Sell Dialog */}
       <Dialog open={openSellDialog} onClose={handleCloseSellDialog}>
         <DialogTitle>
           Sell {selectedHolding?.cryptoName}
@@ -225,9 +189,9 @@ const Portfolio = () => {
             onClick={handleSell} 
             variant="contained" 
             color="secondary"
-            disabled={processingTransaction}
+            disabled={sellCryptoMutation.isPending}
           >
-            {processingTransaction ? <CircularProgress size={24} /> : 'Sell'}
+            {sellCryptoMutation.isPending ? <CircularProgress size={24} /> : 'Sell'}
           </Button>
         </DialogActions>
       </Dialog>

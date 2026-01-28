@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import { 
   Paper, 
   Table, 
@@ -15,33 +15,16 @@ import {
   Chip
 } from '@mui/material';
 import { UserContext } from '../context/UserContext';
-import {getUserTransactionsByType} from '../services/api';
+import { useUserTransactions } from '../hooks';
 
 const TransactionHistory = () => {
-  const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0); 
-  
   const { userId } = useContext(UserContext);
 
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      setLoading(true);
-      
-      try {
-        const transactionType = tabValue === 0 ? 'Buying' : 'Selling';
-        const transactionData = await getUserTransactionsByType(userId, transactionType);
-        setTransactions(transactionData);
-        
-      } catch (error) {
-        console.error("Failed to fetch transactions:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTransactions();
-  }, [userId, tabValue]);
+  const transactionType = tabValue === 0 ? 'Buying' : 'Selling';
+  
+  // Use custom hook
+  const { data: transactions = [], isLoading } = useUserTransactions(userId, transactionType);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -65,7 +48,7 @@ const TransactionHistory = () => {
         </Tabs>
       </Box>
 
-      {loading ? (
+      {isLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
           <CircularProgress />
         </Box>

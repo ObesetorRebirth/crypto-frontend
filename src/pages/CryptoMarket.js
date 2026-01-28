@@ -1,57 +1,19 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import { UserContext } from '../context/UserContext';
-import axios from 'axios';
-import './CryptoMarket.css';
-import { getTop20Cryptos, buyCrypto, getUserBalance } from '../services/api';
+import { useCryptos, useBuyCrypto } from '../hooks';
 
 const CryptoMarketPage = () => {
-  const [cryptos, setCryptos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [selectedCrypto, setSelectedCrypto] = useState(null);
   const [amount, setAmount] = useState('');
   const [showBuyForm, setShowBuyForm] = useState(false);
   const [purchaseStatus, setPurchaseStatus] = useState(null);
   const { userId, updateBalance } = useContext(UserContext);
-  const [lastUpdated, setLastUpdated] = useState(null);
 
-  useEffect(() => {
-    fetchCryptos();
-    
-    const refreshInterval = setInterval(() => {
-      console.log("Refreshing crypto prices...");
-      fetchCryptos();
-    }, 4000);
-    
-    return () => clearInterval(refreshInterval);
-  }, []);
-
-  const fetchCryptos = async () => {
-    try {
-      setLoading(true);
-      
-      const cryptoData = await getTop20Cryptos();
-      
-      const processedData = Array.isArray(cryptoData) ? cryptoData.map(crypto => {
-        return {
-          id: crypto.id,
-          name: crypto.cryptoName,
-          symbol: crypto.symbol,
-          price: crypto.currentPrice,
-          priceChange24h: 0
-        };
-      }) : [];
-      
-      setCryptos(processedData);
-      setLastUpdated(new Date());
-      setError(null);
-    } catch (err) {
-      setError('Failed to load cryptocurrencies');
-      console.error('Error fetching cryptos:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: cryptos = [], isLoading, error, dataUpdatedAt } = useCryptos();
+  
+  const buyCryptoMutation = useBuyCrypto((newBalance) => {
+    updateBalance(newBalance);
+  });
 
   const openBuyForm = (crypto) => {
     setSelectedCrypto(crypto);
@@ -72,28 +34,21 @@ const CryptoMarketPage = () => {
     }
     
     try {
-      if (typeof buyCrypto === 'function') {
-        await buyCrypto(userId, selectedCrypto.id, parseFloat(amount));
-      } else {
-        await axios.post('/api/transactions/buy', {
-          cryptoId: selectedCrypto.id,
-          amount: parseFloat(amount)
-        });
-      }
-
-      const newBalance = await getUserBalance(userId);
-      updateBalance(newBalance);  
+      await buyCryptoMutation.mutateAsync({
+        userId,
+        cryptoId: selectedCrypto.id,
+        quantity: parseFloat(amount)
+      });
       
       setPurchaseStatus({
         success: true,
         message: `Successfully purchased ${amount} ${selectedCrypto.symbol}`
       });
+      
       setTimeout(() => {
         setShowBuyForm(false);
         setPurchaseStatus(null);
       }, 2000);
-      
-      fetchCryptos();
       
     } catch (err) {
       let errorMessage = 'Failed to complete purchase';
@@ -119,78 +74,132 @@ const CryptoMarketPage = () => {
     return parseFloat(value).toFixed(decimals);
   };
 
+  const processedCryptos = Array.isArray(cryptos) ? cryptos.map(crypto => ({
+    id: crypto.id,
+    name: crypto.cryptoName,
+    symbol: crypto.symbol,
+    price: crypto.currentPrice,
+    priceChange24h: 0
+  })) : [];
+
+  const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
+
   return (
-    <div className="crypto-market-container">
-      <h1>Cryptocurrency Market</h1>
-      {lastUpdated && (
-      <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '-10px' }}>
-        Last updated: {lastUpdated.toLocaleTimeString()}
-      </p>
-    )}
-      {loading && <p>Loading cryptocurrencies...</p>}
-      {error && <p className="error-message">{error}</p>}
-      
-      <div className="crypto-list">
-        {cryptos.length === 0 && !loading ? (
-          <p>No cryptocurrencies available. Please check your API connection.</p>
-        ) : (
-          cryptos.map(crypto => (
-            <div key={crypto.id} className="crypto-card">
-              <div className="crypto-info">
-                <h3>{crypto.name}</h3>
-                <p className="crypto-symbol">{crypto.symbol}</p>
-                <p className="crypto-price">${safeToFixed(crypto.price)}</p>
-              </div>
-              <button 
-                className="buy-button"
-                onClick={() => openBuyForm(crypto)}
-              >
-                Buy
-              </button>
+    <div className="min-h-screen bg-dark p-6">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-4xl font-bold text-white mb-2">Cryptocurrency Market</h1>
+        {lastUpdated && (
+          <p className="text-sm text-gray-400 mb-6">
+            Last updated: {lastUpdated.toLocaleTimeString()}
+          </p>
+        )}
+        
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        )}
+        
+        {error && (
+          <div className="bg-red-900/30 border border-red-500 text-red-200 px-4 py-3 rounded mb-4">
+            Failed to load cryptocurrencies
+          </div>
+        )}
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {processedCryptos.length === 0 && !isLoading ? (
+            <div className="col-span-full text-center text-gray-400 py-12">
+              No cryptocurrencies available. Please check your API connection.
             </div>
-          ))
+          ) : (
+            processedCryptos.map(crypto => (
+              <div 
+                key={crypto.id} 
+                className="bg-dark-paper rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-700 hover:border-primary"
+              >
+                <div className="mb-4">
+                  <h3 className="text-xl font-bold text-white mb-1">{crypto.name}</h3>
+                  <p className="text-sm text-gray-400 uppercase">{crypto.symbol}</p>
+                  <p className="text-2xl font-semibold text-secondary mt-3">
+                    ${safeToFixed(crypto.price)}
+                  </p>
+                </div>
+                <button 
+                  className="w-full bg-primary hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded transition-colors duration-200"
+                  onClick={() => openBuyForm(crypto)}
+                >
+                  Buy
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+        
+        {showBuyForm && selectedCrypto && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-dark-paper rounded-lg max-w-md w-full p-6 shadow-2xl border border-gray-700">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-white">Buy {selectedCrypto.name}</h2>
+                <button 
+                  className="text-gray-400 hover:text-white text-3xl leading-none"
+                  onClick={() => setShowBuyForm(false)}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <p className="text-gray-300 mb-6">
+                Current price: <span className="text-secondary font-semibold">${safeToFixed(selectedCrypto.price)}</span>
+              </p>
+              
+              <form onSubmit={handleBuy}>
+                <div className="mb-4">
+                  <label htmlFor="amount" className="block text-sm font-medium text-gray-300 mb-2">
+                    Amount to buy:
+                  </label>
+                  <input
+                    type="number"
+                    id="amount"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    step="0.000001"
+                    min="0"
+                    required
+                    className="w-full px-4 py-2 bg-dark border border-gray-600 rounded text-white focus:outline-none focus:border-primary transition-colors"
+                  />
+                </div>
+                
+                {amount && !isNaN(amount) && (
+                  <div className="bg-gray-800 rounded p-3 mb-4">
+                    <p className="text-gray-300">
+                      Estimated cost: <span className="text-secondary font-semibold">${safeToFixed(parseFloat(amount) * selectedCrypto.price)}</span>
+                    </p>
+                  </div>
+                )}
+                
+                {purchaseStatus && (
+                  <div className={`mb-4 px-4 py-3 rounded ${
+                    purchaseStatus.success 
+                      ? 'bg-green-900/30 border border-green-500 text-green-200' 
+                      : 'bg-red-900/30 border border-red-500 text-red-200'
+                  }`}>
+                    {purchaseStatus.message}
+                  </div>
+                )}
+                
+                <button 
+                  type="submit" 
+                  disabled={buyCryptoMutation.isPending}
+                  className="w-full bg-primary hover:bg-blue-600 disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded transition-colors duration-200"
+                >
+                  {buyCryptoMutation.isPending ? 'Processing...' : 'Confirm Purchase'}
+                </button>
+              </form>
+            </div>
+          </div>
         )}
       </div>
-      
-      {showBuyForm && selectedCrypto && (
-        <div className="modal-overlay">
-          <div className="buy-form-modal">
-            <button className="close-button" onClick={() => setShowBuyForm(false)}>×</button>
-            <h2>Buy {selectedCrypto.name}</h2>
-            <p>Current price: ${safeToFixed(selectedCrypto.price)}</p>
-            
-            <form onSubmit={handleBuy}>
-              <div className="form-group">
-                <label htmlFor="amount">Amount to buy:</label>
-                <input
-                  type="number"
-                  id="amount"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="Enter amount"
-                  step="0.000001"
-                  min="0"
-                  required
-                />
-              </div>
-              
-              {amount && !isNaN(amount) && (
-                <p className="estimate">
-                  Estimated cost: ${safeToFixed(parseFloat(amount) * selectedCrypto.price)}
-                </p>
-              )}
-              
-              {purchaseStatus && (
-                <div className={`status-message ${purchaseStatus.success ? 'success' : 'error'}`}>
-                  {purchaseStatus.message}
-                </div>
-              )}
-              
-              <button type="submit" className="submit-button">Confirm Purchase</button>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
